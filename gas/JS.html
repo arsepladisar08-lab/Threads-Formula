@@ -1,0 +1,819 @@
+<script>
+/**
+ * JS.html - Logika Interaktif Client-Side GAS Web App
+ */
+
+var appState = {
+  settings: {},
+  topics: [],
+  generations: [],
+  posts: [],
+  evaluations: [],
+  formulas: [],
+  activeTab: 'dashboard',
+  chartInstance: null,
+  activeEditingGenId: null
+};
+
+// Initial Load
+document.addEventListener('DOMContentLoaded', function() {
+  loadAppData();
+});
+
+function showToast(msg) {
+  var box = document.getElementById('toast-box');
+  var toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerText = msg;
+  box.appendChild(toast);
+  setTimeout(function() {
+    toast.remove();
+  }, 3500);
+}
+
+function toggleTheme() {
+  var current = document.documentElement.getAttribute('data-theme');
+  var target = current === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', target);
+  showToast('Mode tema: ' + target);
+}
+
+function switchTab(tabName) {
+  appState.activeTab = tabName;
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-content').forEach(function(content) {
+    content.classList.remove('active');
+  });
+
+  var targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(function(b) {
+    return b.getAttribute('onclick').indexOf(tabName) !== -1;
+  });
+  if (targetBtn) targetBtn.classList.add('active');
+
+  var targetContent = document.getElementById('tab-' + tabName);
+  if (targetContent) targetContent.classList.add('active');
+
+  if (tabName === 'dashboard') {
+    renderDashboard();
+  } else if (tabName === 'generator') {
+    populateTopicSelect();
+  } else if (tabName === 'evaluasi') {
+    populatePostSelectForEval();
+  } else if (tabName === 'formula') {
+    renderFormulaTab();
+  } else if (tabName === 'riwayat') {
+    renderHistoryTable();
+  }
+}
+
+function loadAppData() {
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success && res.data) {
+          appState.settings = res.data.settings || {};
+          appState.topics = res.data.topics || [];
+          appState.generations = res.data.generations || [];
+          appState.posts = res.data.posts || [];
+          appState.evaluations = res.data.evaluations || [];
+          appState.formulas = res.data.formulas || [];
+          renderAll();
+          showToast('Data berhasil dimuat');
+        } else {
+          showToast('Error: ' + res.error);
+        }
+      })
+      .withFailureHandler(function(err) {
+        showToast('Koneksi gagal: ' + err.message);
+      })
+      .getAppData();
+  }
+}
+
+function renderAll() {
+  renderDashboard();
+  populateTopicSelect();
+  populatePostSelectForEval();
+  renderPostedList();
+  renderFormulaTab();
+  renderHistoryTable();
+  populateSettingsForm();
+}
+
+function renderDashboard() {
+  var topicsCount = appState.topics.length;
+  var postsCount = appState.posts.length;
+  var evals = appState.evaluations;
+
+  document.getElementById('kpi-topics').innerText = topicsCount;
+  document.getElementById('kpi-posts').innerText = postsCount;
+
+  var totalScore = 0;
+  evals.forEach(function(e) { totalScore += Number(e.engagement_score || 0); });
+  var avgScore = evals.length > 0 ? (totalScore / evals.length).toFixed(1) : '0.0';
+  document.getElementById('kpi-engagement').innerText = avgScore + '%';
+
+  var activeFormula = appState.formulas.length > 0 ? appState.formulas[appState.formulas.length - 1] : null;
+  var statusElem = document.getElementById('kpi-formula-status');
+  if (activeFormula) {
+    statusElem.innerText = activeFormula.status + ' (' + activeFormula.formula_version + ')';
+    if (activeFormula.status === 'FINAL') {
+      statusElem.style.color = 'var(--accent-amber)';
+      document.getElementById('final-formula-container').style.display = 'block';
+      document.getElementById('final-formula-summary').innerText = activeFormula.ringkasan || 'Formula telah mencapai konsistensi tinggi!';
+    } else {
+      statusElem.style.color = 'var(--text-main)';
+      document.getElementById('final-formula-container').style.display = 'none';
+    }
+  }
+
+  renderChart();
+  renderFormatRankings();
+  renderTopContent();
+}
+
+function renderChart() {
+  var ctx = document.getElementById('chart-engagement');
+  if (!ctx) return;
+
+  var evals = appState.evaluations;
+  var labels = evals.map(function(e, i) { return 'Post #' + (i + 1); });
+  var data = evals.map(function(e) { return Number(e.engagement_score || 0); });
+  var targetLine = Number(appState.settings.target_engagement_rate || 5.5);
+
+  if (appState.chartInstance) {
+    appState.chartInstance.destroy();
+  }
+
+  if (typeof Chart !== 'undefined') {
+    appState.chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Engagement Score (%)',
+            data: data,
+            borderColor: '#0095f6',
+            backgroundColor: 'rgba(0, 149, 246, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: true
+          },
+          {
+            label: 'Target (' + targetLine + '%)',
+            data: labels.map(function() { return targetLine; }),
+            borderColor: '#f59e0b',
+            borderDash: [5, 5],
+            borderWidth: 1.5,
+            pointRadius: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#8e8e8e', font: { size: 11 } } }
+        },
+        scales: {
+          x: { ticks: { color: '#8e8e8e' }, grid: { color: '#2a2a2a' } },
+          y: { ticks: { color: '#8e8e8e' }, grid: { color: '#2a2a2a' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+}
+
+function renderFormatRankings() {
+  var container = document.getElementById('ranking-formats');
+  if (!container) return;
+
+  var formatMap = {};
+  appState.evaluations.forEach(function(ev) {
+    var p = appState.posts.find(function(post) { return post.post_id === ev.post_id; });
+    if (!p) return;
+    var gen = appState.generations.find(function(g) { return g.gen_id === p.gen_id; });
+    var fmt = gen ? gen.format : 'Format Campuran';
+
+    if (!formatMap[fmt]) formatMap[fmt] = { total: 0, count: 0 };
+    formatMap[fmt].total += Number(ev.engagement_score || 0);
+    formatMap[fmt].count++;
+  });
+
+  var keys = Object.keys(formatMap);
+  if (keys.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);">Belum ada data evaluasi.</p>';
+    return;
+  }
+
+  var sorted = keys.map(function(k) {
+    return { format: k, avg: (formatMap[k].total / formatMap[k].count).toFixed(2), count: formatMap[k].count };
+  }).sort(function(a, b) { return b.avg - a.avg; });
+
+  var html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+  sorted.forEach(function(item, idx) {
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px;">' +
+      '<div><strong>#' + (idx + 1) + ' ' + item.format + '</strong> <span style="font-size:11px; color:var(--text-muted);">(' + item.count + ' post)</span></div>' +
+      '<div style="font-weight:700; color:var(--accent-green);">' + item.avg + '%</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderTopContent() {
+  var container = document.getElementById('top-content-list');
+  if (!container) return;
+
+  var evals = appState.evaluations.slice().sort(function(a, b) {
+    return Number(b.engagement_score || 0) - Number(a.engagement_score || 0);
+  }).slice(0, 5);
+
+  if (evals.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);">Belum ada data evaluasi post.</p>';
+    return;
+  }
+
+  var html = '<div style="display:flex; flex-direction:column; gap:14px;">';
+  evals.forEach(function(ev, idx) {
+    var post = appState.posts.find(function(p) { return p.post_id === ev.post_id; });
+    var textPreview = post ? post.versi_final_dipost.substring(0, 120) + '...' : 'Post #' + ev.post_id;
+    html += '<div style="background:var(--bg-tertiary); padding:12px 16px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">' +
+      '<div style="max-width:75%;">' +
+        '<div style="font-weight:700; margin-bottom:4px;">#' + (idx + 1) + ' Skor: ' + ev.engagement_score + '% <span style="font-size:11px; color:var(--text-muted);">(' + ev.dievaluasi_pada + ')</span></div>' +
+        '<div style="font-size:12px; color:var(--text-muted);">' + textPreview + '</div>' +
+      '</div>' +
+      '<div>' +
+        '<button class="btn btn-secondary btn-sm" onclick="recyclePost(\'' + ev.post_id + '\')">♻️ Daur Ulang</button>' +
+      '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// TOPIC ENRICHMENT
+function enrichTopic() {
+  var ide = document.getElementById('input-ide-mentah').value.trim();
+  if (!ide) {
+    showToast('Tulis ide mentah terlebih dahulu!');
+    return;
+  }
+
+  var btn = document.getElementById('btn-enrich-topic');
+  btn.innerHTML = '<span class="spinner"></span> Mengolah dengan AI...';
+  btn.disabled = true;
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.innerHTML = '✨ Olah dengan AI';
+        btn.disabled = false;
+        if (res.success && res.data) {
+          document.getElementById('enriched-topic-card').style.display = 'block';
+          document.getElementById('enriched-persona').value = res.data.persona || '';
+          document.getElementById('enriched-pain-point').value = res.data.pain_point || '';
+          document.getElementById('enriched-pilar').value = res.data.pilar_konten || 'Edukasi Praktis';
+          document.getElementById('enriched-angle').value = res.data.sudut_pandang || '';
+          showToast('Ide berhasil diperkaya oleh AI!');
+        } else {
+          showToast('Error: ' + res.error);
+        }
+      })
+      .withFailureHandler(function(err) {
+        btn.innerHTML = '✨ Olah dengan AI';
+        btn.disabled = false;
+        showToast('Gagal memanggil AI: ' + err.message);
+      })
+      .aiEnrichTopic(ide);
+  }
+}
+
+function saveEnrichedTopicOnly() {
+  var ide = document.getElementById('input-ide-mentah').value.trim();
+  var topicData = {
+    ide_mentah: ide,
+    persona: document.getElementById('enriched-persona').value,
+    pain_point: document.getElementById('enriched-pain-point').value,
+    pilar_konten: document.getElementById('enriched-pilar').value,
+    sudut_pandang: document.getElementById('enriched-angle').value
+  };
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          showToast('Topik berhasil disimpan!');
+          loadAppData();
+          document.getElementById('enriched-topic-card').style.display = 'none';
+          document.getElementById('input-ide-mentah').value = '';
+        }
+      })
+      .createTopic(topicData);
+  }
+}
+
+function proceedToGenerate() {
+  var ide = document.getElementById('input-ide-mentah').value.trim();
+  var topicData = {
+    ide_mentah: ide,
+    persona: document.getElementById('enriched-persona').value,
+    pain_point: document.getElementById('enriched-pain-point').value,
+    pilar_konten: document.getElementById('enriched-pilar').value,
+    sudut_pandang: document.getElementById('enriched-angle').value
+  };
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success && res.data) {
+          showToast('Topik disimpan, beralih ke generator...');
+          loadAppData();
+          switchTab('generator');
+          setTimeout(function() {
+            var sel = document.getElementById('select-topic-to-generate');
+            if (sel) {
+              sel.value = res.data.topic_id;
+              generateVariationsForSelected();
+            }
+          }, 600);
+        }
+      })
+      .createTopic(topicData);
+  }
+}
+
+function populateTopicSelect() {
+  var sel = document.getElementById('select-topic-to-generate');
+  if (!sel) return;
+  sel.innerHTML = '';
+  appState.topics.forEach(function(t) {
+    var opt = document.createElement('option');
+    opt.value = t.topic_id;
+    opt.innerText = '[' + t.pilar_konten + '] ' + t.ide_mentah.substring(0, 50);
+    sel.appendChild(opt);
+  });
+}
+
+function generateVariationsForSelected() {
+  var sel = document.getElementById('select-topic-to-generate');
+  var topicId = sel.value;
+  if (!topicId) {
+    showToast('Pilih topik terlebih dahulu!');
+    return;
+  }
+
+  var btn = document.getElementById('btn-generate-variations');
+  btn.innerHTML = '<span class="spinner"></span> Membuat Variasi...';
+  btn.disabled = true;
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.innerHTML = 'Generate Variasi';
+        btn.disabled = false;
+        if (res.success && res.data) {
+          renderVariationsList(res.data);
+          loadAppData();
+          showToast('3-5 variasi konten berhasil dibuat!');
+        } else {
+          showToast('Error: ' + res.error);
+        }
+      })
+      .withFailureHandler(function(err) {
+        btn.innerHTML = 'Generate Variasi';
+        btn.disabled = false;
+        showToast('Gagal: ' + err.message);
+      })
+      .aiGenerateVariations(topicId);
+  }
+}
+
+function renderVariationsList(variations) {
+  var container = document.getElementById('generated-variations-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  variations.forEach(function(v, idx) {
+    var card = document.createElement('div');
+    card.className = 'variation-card' + (v.is_exploration ? ' exploration' : '');
+    card.innerHTML = 
+      '<div class="var-header">' +
+        '<div><strong>Variasi #' + (idx + 1) + ' · ' + v.format + '</strong> ' + (v.is_exploration ? '<span style="color:var(--accent-amber); font-weight:700;">[Eksplorasi Hipotesis Baru]</span>' : '') + '</div>' +
+        '<div>Prediksi Skor: <span style="font-weight:700; color:var(--accent-green);">' + v.prediksi_skor + '/10</span></div>' +
+      '</div>' +
+      '<div class="var-hook">' + escapeHtml(v.hook) + '</div>' +
+      '<div class="var-body">' + escapeHtml(v.body) + '</div>' +
+      '<div class="var-cta-reply"><strong>Balasan Pertama (Reply #1):</strong><br>' + escapeHtml(v.cta_reply) + '</div>' +
+      '<div style="font-size:12px; color:var(--text-muted); margin-bottom:12px;"><em>Alasan Strategi:</em> ' + escapeHtml(v.alasan_strategi) + '</div>' +
+      '<div class="var-actions">' +
+        '<button class="btn btn-secondary btn-sm" onclick="copyContentText(\'' + escapeForJs(v.hook + '\n\n' + v.body) + '\')">📋 Salin Teks</button>' +
+        '<button class="btn btn-secondary btn-sm" onclick="openEditModal(\'' + v.gen_id + '\')">✏️ Edit</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="markForPosting(\'' + v.gen_id + '\')">🚀 Tandai Akan Diposting</button>' +
+      '</div>';
+    container.appendChild(card);
+  });
+}
+
+function copyContentText(text) {
+  navigator.clipboard.writeText(text).then(function() {
+    showToast('Teks berhasil disalin ke clipboard!');
+  });
+}
+
+function markForPosting(genId) {
+  var gen = appState.generations.find(function(g) { return g.gen_id === genId; });
+  if (!gen) return;
+
+  switchTab('posting');
+  var now = new Date();
+  document.getElementById('post-date').value = now.toISOString().substring(0, 10);
+  document.getElementById('post-time').value = now.toTimeString().substring(0, 5);
+  document.getElementById('post-final-text').value = gen.hook + '\n\n' + gen.body;
+  showToast('Variasi dimuat ke formulir posting');
+}
+
+function submitPostRecord() {
+  var date = document.getElementById('post-date').value;
+  var time = document.getElementById('post-time').value;
+  var link = document.getElementById('post-link').value.trim();
+  var finalText = document.getElementById('post-final-text').value.trim();
+
+  if (!finalText) {
+    showToast('Versi final yang dipost wajib diisi!');
+    return;
+  }
+
+  var postData = {
+    tanggal_posting: date,
+    jam_posting: time,
+    link_threads: link,
+    versi_final_dipost: finalText
+  };
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          showToast('Catatan posting berhasil disimpan!');
+          loadAppData();
+          document.getElementById('post-link').value = '';
+          document.getElementById('post-final-text').value = '';
+        }
+      })
+      .recordPost(postData);
+  }
+}
+
+function renderPostedList() {
+  var container = document.getElementById('posted-list-table');
+  if (!container) return;
+
+  if (appState.posts.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);">Belum ada postingan yang dicatat.</p>';
+    return;
+  }
+
+  var html = '<table class="data-table"><thead><tr><th>Tanggal / Jam</th><th>Cuplikan Konten</th><th>Link Threads</th><th>Aksi</th></tr></thead><tbody>';
+  appState.posts.forEach(function(p) {
+    html += '<tr>' +
+      '<td>' + p.tanggal_posting + ' ' + p.jam_posting + '</td>' +
+      '<td>' + escapeHtml(p.versi_final_dipost.substring(0, 90)) + '...</td>' +
+      '<td>' + (p.link_threads ? '<a href="' + p.link_threads + '" target="_blank" style="color:var(--accent-blue);">Buka Post</a>' : '-') + '</td>' +
+      '<td><button class="btn btn-secondary btn-sm" onclick="evaluateThisPost(\'' + p.post_id + '\')">Isi Evaluasi</button></td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function populatePostSelectForEval() {
+  var sel = document.getElementById('eval-select-post');
+  if (!sel) return;
+  sel.innerHTML = '';
+  appState.posts.forEach(function(p) {
+    var opt = document.createElement('option');
+    opt.value = p.post_id;
+    opt.innerText = p.tanggal_posting + ' - ' + p.versi_final_dipost.substring(0, 45) + '...';
+    sel.appendChild(opt);
+  });
+}
+
+function evaluateThisPost(postId) {
+  switchTab('evaluasi');
+  var sel = document.getElementById('eval-select-post');
+  if (sel) sel.value = postId;
+}
+
+function calculateLiveScore() {
+  var views = Number(document.getElementById('eval-views').value) || 0;
+  var likes = Number(document.getElementById('eval-likes').value) || 0;
+  var replies = Number(document.getElementById('eval-replies').value) || 0;
+  var reposts = Number(document.getElementById('eval-reposts').value) || 0;
+  var quotes = Number(document.getElementById('eval-quotes').value) || 0;
+  var shares = Number(document.getElementById('eval-shares').value) || 0;
+
+  var bReplies = Number(appState.settings.bobot_replies || 3);
+  var bReposts = Number(appState.settings.bobot_reposts || 2);
+  var bQuotes = Number(appState.settings.bobot_quotes || 2);
+  var bShares = Number(appState.settings.bobot_shares || 2);
+  var bLikes = Number(appState.settings.bobot_likes || 1);
+
+  if (views <= 0) {
+    document.getElementById('eval-live-score').innerText = '0.00%';
+    return;
+  }
+
+  var weighted = (replies * bReplies) + (reposts * bReposts) + (quotes * bQuotes) + (shares * bShares) + (likes * bLikes);
+  var score = (weighted / views) * 100;
+  document.getElementById('eval-live-score').innerText = score.toFixed(2) + '%';
+}
+
+function submitEvaluationAndAnalyze() {
+  var postId = document.getElementById('eval-select-post').value;
+  if (!postId) {
+    showToast('Pilih post yang dievaluasi!');
+    return;
+  }
+
+  var evalData = {
+    post_id: postId,
+    dievaluasi_pada: document.getElementById('eval-timeframe').value,
+    views: Number(document.getElementById('eval-views').value) || 0,
+    likes: Number(document.getElementById('eval-likes').value) || 0,
+    replies: Number(document.getElementById('eval-replies').value) || 0,
+    reposts: Number(document.getElementById('eval-reposts').value) || 0,
+    quotes: Number(document.getElementById('eval-quotes').value) || 0,
+    shares: Number(document.getElementById('eval-shares').value) || 0,
+    follower_baru: Number(document.getElementById('eval-followers').value) || 0,
+    klik_link: Number(document.getElementById('eval-clicks').value) || 0,
+    penjualan: Number(document.getElementById('eval-sales').value) || 0,
+    rating_diri: Number(document.getElementById('eval-rating-diri').value) || 4,
+    sentimen_komentar: document.getElementById('eval-sentimen').value,
+    catatan_user: document.getElementById('eval-catatan').value,
+    contoh_komentar: document.getElementById('eval-contoh-komentar').value
+  };
+
+  var btn = document.getElementById('btn-submit-eval');
+  btn.innerHTML = '<span class="spinner"></span> Menganalisis & Memperbarui Formula...';
+  btn.disabled = true;
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.innerHTML = '🧠 Simpan & Analisis dengan AI (Update Formula)';
+        btn.disabled = false;
+        if (res.success && res.data) {
+          showToast('Evaluasi dianalisis & formula diperbarui!');
+          renderEvalAnalysisResult(res.data);
+          loadAppData();
+        } else {
+          showToast('Error: ' + res.error);
+        }
+      })
+      .withFailureHandler(function(err) {
+        btn.innerHTML = '🧠 Simpan & Analisis dengan AI (Update Formula)';
+        btn.disabled = false;
+        showToast('Gagal: ' + err.message);
+      })
+      .aiAnalyzeEvaluation(evalData);
+  }
+}
+
+function renderEvalAnalysisResult(data) {
+  var card = document.getElementById('eval-analysis-result-card');
+  var body = document.getElementById('eval-analysis-body');
+  card.style.display = 'block';
+
+  var an = data.analysis || {};
+  var f = data.updatedFormula || {};
+
+  body.innerHTML = 
+    '<div style="background:var(--bg-tertiary); padding:16px; border-radius:8px; margin-bottom:16px;">' +
+      '<div style="font-size:14px; font-weight:700; color:var(--accent-blue); margin-bottom:6px;">' + (an.skor_dibandingkan_rata2 || 'Hasil Analisis') + '</div>' +
+      '<div style="font-size:13px; line-height:1.6; margin-bottom:10px;">' +
+        '<strong>Kelebihan Post:</strong> ' + escapeHtml(an.kelebihan_post || '-') + '<br>' +
+        '<strong>Kelemahan Post:</strong> ' + escapeHtml(an.kelemahan_post || '-') + '<br>' +
+        '<strong>Rekomendasi Perbaikan:</strong> ' + escapeHtml(an.rekomendasi_perbaikan || '-') +
+      '</div>' +
+    '</div>' +
+    '<div style="border-top:1px dashed var(--border-color); padding-top:12px;">' +
+      '<div style="font-weight:700; font-size:13px; margin-bottom:4px;">Evolusi Formula Engine: <strong>' + (f.formula_version || 'v Baru') + ' (' + (f.status || 'eksperimen') + ')</strong></div>' +
+      '<div style="font-size:12px; color:var(--text-muted);">' + escapeHtml(f.ringkasan || '') + '</div>' +
+      (f.saran_eksperimen_berikutnya ? '<div style="font-size:12px; color:var(--accent-amber); margin-top:6px;"><strong>Uji Coba Berikutnya:</strong> ' + escapeHtml(f.saran_eksperimen_berikutnya) + '</div>' : '') +
+    '</div>';
+}
+
+function renderFormulaTab() {
+  var active = appState.formulas.length > 0 ? appState.formulas[appState.formulas.length - 1] : null;
+  if (!active) return;
+
+  document.getElementById('formula-version-display').innerText = active.formula_version;
+  document.getElementById('formula-confidence-display').innerText = (active.confidence || 50) + '%';
+
+  var tag = document.getElementById('formula-status-tag');
+  tag.innerText = active.status.toUpperCase();
+  if (active.status === 'FINAL') {
+    tag.style.color = 'var(--accent-amber)';
+  } else if (active.status === 'kandidat') {
+    tag.style.color = 'var(--accent-blue)';
+  } else {
+    tag.style.color = 'var(--text-muted)';
+  }
+
+  var details = document.getElementById('formula-full-details');
+  details.innerHTML = 
+    '<div class="grid-2" style="margin-bottom:16px;">' +
+      '<div><strong>Struktur Hook Teruji:</strong><br><span style="color:var(--text-muted);">' + escapeHtml(active.struktur_hook || '-') + '</span></div>' +
+      '<div><strong>Format Terbaik:</strong><br><span style="color:var(--text-muted);">' + escapeHtml(active.format_terbaik || '-') + '</span></div>' +
+    '</div>' +
+    '<div class="grid-2" style="margin-bottom:16px;">' +
+      '<div><strong>Waktu Posting Terbaik:</strong><br><span style="color:var(--text-muted);">' + escapeHtml(active.waktu_posting_terbaik || '-') + '</span></div>' +
+      '<div><strong>Pilar Konten Unggulan:</strong><br><span style="color:var(--text-muted);">' + escapeHtml(active.pilar_terbaik || '-') + '</span></div>' +
+    '</div>' +
+    '<div style="margin-bottom:16px;"><strong>Ringkasan Eksekutif:</strong><br><span style="color:var(--text-muted);">' + escapeHtml(active.ringkasan || '-') + '</span></div>';
+
+  var histContainer = document.getElementById('formula-history-list');
+  var historyHtml = '';
+  appState.formulas.slice().reverse().forEach(function(f) {
+    historyHtml += '<div style="border-bottom:1px solid var(--border-color); padding:10px 0;">' +
+      '<div style="font-weight:700; font-size:13px;">' + f.formula_version + ' (' + f.status + ') - Confidence ' + f.confidence + '%</div>' +
+      '<div style="font-size:12px; color:var(--text-muted);">' + escapeHtml(f.changelog || f.ringkasan || '') + '</div>' +
+    '</div>';
+  });
+  histContainer.innerHTML = historyHtml;
+}
+
+function renderHistoryTable() {
+  var tbody = document.getElementById('history-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  appState.posts.forEach(function(p) {
+    var gen = appState.generations.find(function(g) { return g.gen_id === p.gen_id; });
+    var topic = gen ? appState.topics.find(function(t) { return t.topic_id === gen.topic_id; }) : null;
+    var evals = appState.evaluations.filter(function(e) { return e.post_id === p.post_id; });
+    var latestEval = evals.length > 0 ? evals[evals.length - 1] : null;
+
+    var tr = document.createElement('tr');
+    tr.innerHTML = 
+      '<td>' + p.tanggal_posting + '</td>' +
+      '<td><strong>' + (topic ? topic.pilar_konten : '-') + '</strong><br><span style="font-size:11px; color:var(--text-muted);">' + (topic ? escapeHtml(topic.ide_mentah.substring(0, 40)) : '-') + '</span></td>' +
+      '<td>' + (gen ? gen.format : 'Manual') + '</td>' +
+      '<td>' + escapeHtml(p.versi_final_dipost.substring(0, 60)) + '...</td>' +
+      '<td>' + (latestEval ? '<strong>' + latestEval.engagement_score + '%</strong> (' + latestEval.dievaluasi_pada + ')' : '<span style="color:var(--text-muted);">Belum</span>') + '</td>' +
+      '<td>' + (latestEval ? '<span style="color:var(--accent-green);">Dievaluasi</span>' : '<span style="color:var(--accent-amber);">Tayang</span>') + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function exportDataToCSV() {
+  var rows = [['Tanggal Posting', 'Pilar', 'Format', 'Teks Konten', 'Engagement Score (%)', 'Views', 'Likes', 'Replies']];
+  appState.posts.forEach(function(p) {
+    var gen = appState.generations.find(function(g) { return g.gen_id === p.gen_id; });
+    var topic = gen ? appState.topics.find(function(t) { return t.topic_id === gen.topic_id; }) : null;
+    var ev = appState.evaluations.find(function(e) { return e.post_id === p.post_id; });
+
+    rows.push([
+      p.tanggal_posting,
+      topic ? topic.pilar_konten : '',
+      gen ? gen.format : '',
+      '"' + (p.versi_final_dipost || '').replace(/"/g, '""') + '"',
+      ev ? ev.engagement_score : '',
+      ev ? ev.views : '',
+      ev ? ev.likes : '',
+      ev ? ev.replies : ''
+    ]);
+  });
+
+  var csvContent = 'data:text/csv;charset=utf-8,' + rows.map(function(e) { return e.join(','); }).join('\n');
+  var encodedUri = encodeURI(csvContent);
+  var link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', 'Threads_Formula_Lab_Export.csv');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  showToast('Data CSV berhasil diunduh!');
+}
+
+function recyclePost(postId) {
+  showToast('Memproses daur ulang dengan AI...');
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success && res.data) {
+          switchTab('topik');
+          document.getElementById('input-ide-mentah').value = res.data.new_hook;
+          enrichTopic();
+          showToast('Konten berhasil didaur ulang menjadi sudut pandang baru!');
+        } else {
+          showToast('Error: ' + res.error);
+        }
+      })
+      .aiRecycleContent(postId);
+  }
+}
+
+function runSeedData() {
+  if (confirm('Muat 3 post contoh dan data simulasi awal?')) {
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          showToast(res.message);
+          loadAppData();
+        })
+        .seedDemoData();
+    }
+  }
+}
+
+function populateSettingsForm() {
+  var s = appState.settings;
+  if (!s) return;
+  document.getElementById('set-niche').value = s.niche || '';
+  document.getElementById('set-jenis').value = s.jenis_produk || '';
+  document.getElementById('set-nama').value = s.nama_produk || '';
+  document.getElementById('set-harga').value = s.harga_produk || '';
+  document.getElementById('set-link').value = s.link_produk || '';
+  document.getElementById('set-persona').value = s.persona_audiens || '';
+  document.getElementById('set-pain-point').value = s.pain_point_utama || '';
+  document.getElementById('set-gaya').value = s.gaya_bahasa || 'santai';
+  document.getElementById('set-target-rate').value = s.target_engagement_rate || 5.5;
+  document.getElementById('set-bobot-replies').value = s.bobot_replies || 3;
+  document.getElementById('set-bobot-reposts').value = s.bobot_reposts || 2;
+  document.getElementById('set-bobot-quotes').value = s.bobot_quotes || 2;
+  document.getElementById('set-bobot-shares').value = s.bobot_shares || 2;
+}
+
+function saveSettingsForm() {
+  var newSettings = {
+    niche: document.getElementById('set-niche').value,
+    jenis_produk: document.getElementById('set-jenis').value,
+    nama_produk: document.getElementById('set-nama').value,
+    harga_produk: document.getElementById('set-harga').value,
+    link_produk: document.getElementById('set-link').value,
+    persona_audiens: document.getElementById('set-persona').value,
+    pain_point_utama: document.getElementById('set-pain-point').value,
+    gaya_bahasa: document.getElementById('set-gaya').value,
+    target_engagement_rate: Number(document.getElementById('set-target-rate').value) || 5.5,
+    bobot_replies: Number(document.getElementById('set-bobot-replies').value) || 3,
+    bobot_reposts: Number(document.getElementById('set-bobot-reposts').value) || 2,
+    bobot_quotes: Number(document.getElementById('set-bobot-quotes').value) || 2,
+    bobot_shares: Number(document.getElementById('set-bobot-shares').value) || 2,
+    bobot_likes: 1
+  };
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          showToast('Pengaturan berhasil disimpan!');
+          loadAppData();
+        }
+      })
+      .saveSettings(newSettings);
+  }
+}
+
+// EDIT MODAL HELPERS
+function openEditModal(genId) {
+  var gen = appState.generations.find(function(g) { return g.gen_id === genId; });
+  if (!gen) return;
+  appState.activeEditingGenId = genId;
+  document.getElementById('modal-edit-hook').value = gen.hook;
+  document.getElementById('modal-edit-body').value = gen.body;
+  document.getElementById('modal-edit-cta').value = gen.cta_reply;
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  appState.activeEditingGenId = null;
+}
+
+function saveEditModal() {
+  var gen = appState.generations.find(function(g) { return g.gen_id === appState.activeEditingGenId; });
+  if (gen) {
+    gen.hook = document.getElementById('modal-edit-hook').value;
+    gen.body = document.getElementById('modal-edit-body').value;
+    gen.cta_reply = document.getElementById('modal-edit-cta').value;
+    showToast('Variasi diperbarui!');
+    renderVariationsList(appState.generations.filter(function(g) { return g.topic_id === gen.topic_id; }));
+  }
+  closeEditModal();
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escapeForJs(str) {
+  if (!str) return '';
+  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+</script>

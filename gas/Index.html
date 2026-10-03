@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Threads Formula Lab</title>
+    <!-- Chart.js via CDN for engagement graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <?!= include('CSS'); ?>
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- HEADER -->
+      <header class="app-header">
+        <div class="brand-wrapper">
+          <div class="brand-icon">@</div>
+          <div>
+            <h1 class="brand-title">Threads Formula Lab</h1>
+            <p class="brand-subtitle">Siklus Konten Organik & Optimasi Algoritma Produk Digital</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary btn-sm" onclick="toggleTheme()">🌓 Mode Tampilan</button>
+          <button class="btn btn-secondary btn-sm" onclick="runSeedData()">⚡ Isi Data Demo</button>
+        </div>
+      </header>
+
+      <!-- NAVIGATION TABS -->
+      <nav class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+        <button class="tab-btn" onclick="switchTab('topik')">💡 Topik Baru</button>
+        <button class="tab-btn" onclick="switchTab('generator')">✍️ Konten Generator</button>
+        <button class="tab-btn" onclick="switchTab('posting')">🚀 Tracking Posting</button>
+        <button class="tab-btn" onclick="switchTab('evaluasi')">📈 Evaluasi Mandiri</button>
+        <button class="tab-btn" onclick="switchTab('formula')">🧪 Formula Engine</button>
+        <button class="tab-btn" onclick="switchTab('riwayat')">📁 Riwayat & Ekspor</button>
+        <button class="tab-btn" onclick="switchTab('pengaturan')">⚙️ Pengaturan</button>
+        <button class="tab-btn" onclick="switchTab('panduan')">📖 Panduan GAS</button>
+      </nav>
+
+      <!-- TAB 1: DASHBOARD -->
+      <div id="tab-dashboard" class="tab-content active">
+        <!-- KPI METRICS -->
+        <div class="grid-4" style="margin-bottom: 20px;">
+          <div class="stat-box">
+            <div class="stat-label">Total Topik Diolah</div>
+            <div class="stat-value" id="kpi-topics">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Postingan Ditayangkan</div>
+            <div class="stat-value" id="kpi-posts">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Rata-rata Engagement</div>
+            <div class="stat-value" id="kpi-engagement">0.0%</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Status Formula Aktif</div>
+            <div class="stat-value" id="kpi-formula-status" style="font-size: 18px; text-transform: capitalize;">-</div>
+          </div>
+        </div>
+
+        <!-- FORMULA FINAL BANNER IF ACHIEVED -->
+        <div id="final-formula-container" style="display:none;" class="final-formula-banner">
+          <div style="font-size: 16px; font-weight: 800; color: var(--accent-amber); margin-bottom: 6px;">
+            🏆 FORMULA FINAL TELAH DITEMUKAN!
+          </div>
+          <p id="final-formula-summary" style="font-size: 13px; line-height: 1.6;"></p>
+        </div>
+
+        <!-- CHART & RANKING -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">📈 Tren Engagement Rate per Post (%)</div>
+            <div style="position: relative; height: 260px; width: 100%;">
+              <canvas id="chart-engagement"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">🥇 Ranking Performa Format Konten</div>
+            <div id="ranking-formats" style="font-size: 13px;">
+              <p style="color: var(--text-muted);">Memuat peringkat...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TOP 5 CONTENT WITH RECYCLE -->
+        <div class="card">
+          <div class="card-title">
+            <span>🔥 Top Konten Berkinerja Terbaik</span>
+            <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">Daur ulang dengan 1 klik AI</span>
+          </div>
+          <div id="top-content-list">
+            <p style="color: var(--text-muted);">Belum ada data evaluasi post.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: TOPIK BARU -->
+      <div id="tab-topik" class="tab-content">
+        <div class="card">
+          <div class="card-title">💡 Input Ide Topik Mentah</div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Tulis ide 1 kalimat sekalipun. AI akan melengkapinya menjadi persona sasaran, pain point, pilar konten, dan sudut pandang yang mematikan.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Ide Topik Mentah</label>
+            <input type="text" id="input-ide-mentah" class="form-input" placeholder="Contoh: Pengalaman pertama jualan template Notion waktu libur weekend">
+          </div>
+          <button class="btn btn-primary" id="btn-enrich-topic" onclick="enrichTopic()">
+            <span>✨ Olah dengan AI</span>
+          </button>
+        </div>
+
+        <!-- AI ENRICHED RESULTS -->
+        <div id="enriched-topic-card" class="card" style="display: none;">
+          <div class="card-title">🎯 Hasil Pengolahan Topik (Bisa Diedit)</div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Persona Sasaran</label>
+              <input type="text" id="enriched-persona" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pilar Konten</label>
+              <select id="enriched-pilar" class="form-select">
+                <option value="Edukasi Praktis">Edukasi Praktis</option>
+                <option value="Studi Kasus / Realita">Studi Kasus / Realita</option>
+                <option value="Opini Kontroversial">Opini Kontroversial</option>
+                <option value="Behind the Scenes">Behind the Scenes</option>
+                <option value="Inspirasi & Mindset">Inspirasi & Mindset</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pain Point Utama</label>
+            <input type="text" id="enriched-pain-point" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sudut Pandang (Angle) Kontras</label>
+            <textarea id="enriched-angle" class="form-textarea" rows="2"></textarea>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="saveEnrichedTopicOnly()">Simpan Topik Saja</button>
+            <button class="btn btn-primary" onclick="proceedToGenerate()">🚀 Simpan & Generate Konten</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: KONTEN GENERATOR -->
+      <div id="tab-generator" class="tab-content">
+        <div class="card">
+          <div class="card-title">
+            <span>✍️ AI Content Generator</span>
+            <span id="active-formula-badge" style="font-size: 12px; color: var(--text-muted); font-weight: normal;">Formula: v1.0</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Pilih topik untuk menghasilkan 3–5 variasi konten (termasuk 1 variasi eksperimen). Konten dirancang tanpa hard-selling di post utama.
+          </p>
+          <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <select id="select-topic-to-generate" class="form-select" style="max-width: 400px;"></select>
+            <button class="btn btn-primary" id="btn-generate-variations" onclick="generateVariationsForSelected()">
+              Generate Variasi
+            </button>
+          </div>
+        </div>
+
+        <div id="generated-variations-container"></div>
+      </div>
+
+      <!-- TAB 4: TRACKING POSTING -->
+      <div id="tab-posting" class="tab-content">
+        <!-- REMINDER BOX -->
+        <div style="background: rgba(0, 149, 246, 0.1); border: 1px solid var(--accent-blue); padding: 14px 18px; border-radius: 10px; margin-bottom: 20px; font-size: 13px;">
+          💡 <strong>Pengingat Algoritma:</strong> Balas komentar dalam <strong>30–60 menit pertama</strong> setelah posting untuk memicu sinyal distribusi viral dari algoritma Threads!
+        </div>
+
+        <div class="card">
+          <div class="card-title">📝 Catat Postingan yang Sudah Tayang</div>
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Tanggal Posting</label>
+              <input type="date" id="post-date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jam Posting</label>
+              <input type="time" id="post-time" class="form-input">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Link Postingan Threads</label>
+            <input type="url" id="post-link" class="form-input" placeholder="https://threads.net/@username/post/...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Versi Final yang Dipost (Bila Ada Koreksi)</label>
+            <textarea id="post-final-text" class="form-textarea" rows="4" placeholder="Salin teks yang benar-benar dipost ke Threads..."></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="submitPostRecord()">Simpan Catatan Posting</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📋 Riwayat Postingan Aktif</div>
+          <div id="posted-list-table"></div>
+        </div>
+      </div>
+
+      <!-- TAB 5: EVALUASI MANDIRI -->
+      <div id="tab-evaluasi" class="tab-content">
+        <div class="card">
+          <div class="card-title">📈 Form Evaluasi Mandiri Per Post</div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Isi metrik performa setelah post tayang. Formula engagement score akan dihitung secara otomatis.
+          </p>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Pilih Postingan untuk Dievaluasi</label>
+              <select id="eval-select-post" class="form-select"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Titik Waktu Evaluasi</label>
+              <select id="eval-timeframe" class="form-select">
+                <option value="24 jam">24 Jam Pertama</option>
+                <option value="72 jam">72 Jam</option>
+                <option value="7 hari">7 Hari</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="form-group">
+              <label class="form-label">Views (Tayangan)</label>
+              <input type="number" id="eval-views" class="form-input" value="0" oninput="calculateLiveScore()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Likes</label>
+              <input type="number" id="eval-likes" class="form-input" value="0" oninput="calculateLiveScore()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Replies (Balasan ×3)</label>
+              <input type="number" id="eval-replies" class="form-input" value="0" oninput="calculateLiveScore()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Reposts (×2)</label>
+              <input type="number" id="eval-reposts" class="form-input" value="0" oninput="calculateLiveScore()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Quotes (×2)</label>
+              <input type="number" id="eval-quotes" class="form-input" value="0" oninput="calculateLiveScore()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shares (×2)</label>
+              <input type="number" id="eval-shares" class="form-input" value="0" oninput="calculateLiveScore()">
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="form-group">
+              <label class="form-label">Follower Baru</label>
+              <input type="number" id="eval-followers" class="form-input" value="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Klik Link Produk</label>
+              <input type="number" id="eval-clicks" class="form-input" value="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Penjualan Terjadi (Order)</label>
+              <input type="number" id="eval-sales" class="form-input" value="0">
+            </div>
+          </div>
+
+          <!-- LIVE ENGAGEMENT SCORE DISPLAY -->
+          <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 12px; color: var(--text-muted);">Hasil Hitung Engagement Score:</div>
+              <div id="eval-live-score" style="font-size: 24px; font-weight: 800; color: var(--accent-green);">0.00%</div>
+            </div>
+            <div style="font-size: 12px; text-align: right; color: var(--text-muted);">
+              Rumus: ((Replies×3)+(Reposts×2)+(Quotes×2)+(Shares×2)+Likes) / Views × 100
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Rating Kepuasan Diri (1 - 5)</label>
+              <select id="eval-rating-diri" class="form-select">
+                <option value="5">⭐⭐⭐⭐⭐ 5/5 - Sangat Memuaskan</option>
+                <option value="4" selected>⭐⭐⭐⭐ 4/5 - Bagus</option>
+                <option value="3">⭐⭐⭐ 3/5 - Cukup</option>
+                <option value="2">⭐⭐ 2/5 - Kurang</option>
+                <option value="1">⭐ 1/5 - Mengecewakan</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sentimen Komentar</label>
+              <select id="eval-sentimen" class="form-select">
+                <option value="positif">Positif / Suportif</option>
+                <option value="campuran" selected>Campuran / Diskusi Hangat</option>
+                <option value="negatif">Kritik / Negatif</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catatan Pengamatan Anda (Apa yang terasa berhasil atau gagal?)</label>
+            <textarea id="eval-catatan" class="form-textarea" rows="2" placeholder="Contoh: Hook pertanyaan biner berhasil memancing balasan panjang di jam istirahat siang."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Contoh Komentar Terbaik dari Audiens</label>
+            <input type="text" id="eval-contoh-komentar" class="form-input" placeholder="Salin komentar audiens yang paling bermakna...">
+          </div>
+
+          <button class="btn btn-primary" id="btn-submit-eval" onclick="submitEvaluationAndAnalyze()">
+            🧠 Simpan & Analisis dengan AI (Update Formula)
+          </button>
+        </div>
+
+        <!-- AI ANALYSIS RESULT MODAL / CARD -->
+        <div id="eval-analysis-result-card" class="card" style="display: none;">
+          <div class="card-title">🔍 Hasil Analisis AI & Evolusi Formula</div>
+          <div id="eval-analysis-body"></div>
+        </div>
+      </div>
+
+      <!-- TAB 6: FORMULA ENGINE -->
+      <div id="tab-formula" class="tab-content">
+        <div class="card">
+          <div class="card-title">
+            <span>🧪 Status Formula Saat Ini</span>
+            <span id="formula-status-tag" style="font-weight: 700; font-size: 13px;"></span>
+          </div>
+
+          <div class="grid-2" style="margin-bottom: 20px;">
+            <div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Versi Formula Aktif</div>
+              <div id="formula-version-display" style="font-size: 26px; font-weight: 800;">v1.0</div>
+            </div>
+            <div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Tingkat Keyakinan (Confidence)</div>
+              <div id="formula-confidence-display" style="font-size: 26px; font-weight: 800;">45%</div>
+            </div>
+          </div>
+
+          <div id="formula-full-details"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📜 Riwayat Evolusi Formula (Changelog)</div>
+          <div id="formula-history-list"></div>
+        </div>
+      </div>
+
+      <!-- TAB 7: RIWAYAT & EKSPOR -->
+      <div id="tab-riwayat" class="tab-content">
+        <div class="card">
+          <div class="card-title">
+            <span>📁 Bank Konten & Riwayat Lengkap</span>
+            <button class="btn btn-secondary btn-sm" onclick="exportDataToCSV()">📥 Ekspor ke CSV</button>
+          </div>
+          <div style="margin-bottom: 16px;">
+            <input type="text" id="history-search" class="form-input" placeholder="Cari topik, isi konten, atau formula..." oninput="filterHistoryTable()">
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="data-table" id="history-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Topik / Pilar</th>
+                  <th>Format Konten</th>
+                  <th>Hook Pembuka</th>
+                  <th>Engagement</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 8: PENGATURAN -->
+      <div id="tab-pengaturan" class="tab-content">
+        <div class="card">
+          <div class="card-title">⚙️ Profil Kreator & Penentuan Bobot Algoritma</div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+            Profil ini disuntikkan ke setiap prompt AI untuk menghasilkan konten yang sesuai dengan produk dan audiens Anda.
+          </p>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Niche Kreator</label>
+              <input type="text" id="set-niche" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Jenis Produk</label>
+              <input type="text" id="set-jenis" class="form-input">
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Nama Produk Digital</label>
+              <input type="text" id="set-nama" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Harga Produk</label>
+              <input type="text" id="set-harga" class="form-input">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tautan Produk (Ditaruh di Balasan Pertama)</label>
+            <input type="url" id="set-link" class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Persona Audiens Target</label>
+            <textarea id="set-persona" class="form-textarea" rows="2"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Pain Point Utama Audiens</label>
+            <textarea id="set-pain-point" class="form-textarea" rows="2"></textarea>
+          </div>
+
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Gaya Bahasa (Tone of Voice)</label>
+              <select id="set-gaya" class="form-select">
+                <option value="santai">Santai (Sahabat Seperjuangan)</option>
+                <option value="profesional">Profesional & Berbobot</option>
+                <option value="gaul Indonesia">Gaul Indonesia (Kasual & Gaul)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Engagement Rate (%)</label>
+              <input type="number" id="set-target-rate" class="form-input" step="0.1">
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
+            <div style="font-weight: 700; font-size: 13px; margin-bottom: 10px;">Bobot Scoring Algoritma Threads:</div>
+            <div class="grid-4">
+              <div class="form-group">
+                <label class="form-label">Bobot Replies</label>
+                <input type="number" id="set-bobot-replies" class="form-input">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Bobot Reposts</label>
+                <input type="number" id="set-bobot-reposts" class="form-input">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Bobot Quotes</label>
+                <input type="number" id="set-bobot-quotes" class="form-input">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Bobot Shares</label>
+                <input type="number" id="set-bobot-shares" class="form-input">
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-primary" onclick="saveSettingsForm()">Simpan Pengaturan</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 9: PANDUAN DEPLOY GAS -->
+      <div id="tab-panduan" class="tab-content">
+        <div class="card">
+          <div class="card-title">📖 Panduan Lengkap Instalasi ke Google Apps Script (GAS)</div>
+          <ol style="font-size: 13px; line-height: 1.8; margin-left: 20px; color: var(--text-muted);">
+            <li><strong>Buat Spreadsheet Baru:</strong> Buka <a href="https://sheets.new" target="_blank" style="color: var(--accent-blue);">sheets.new</a> di browser Anda. Beri nama misal: <em>"Threads Formula Lab DB"</em>.</li>
+            <li><strong>Buka Script Editor:</strong> Klik menu <code>Extensions</code> → <code>Apps Script</code>.</li>
+            <li><strong>Buat File Script:</strong> Buat file dengan nama-nama berikut di Apps Script editor:
+              <ul style="margin-left: 20px; margin-top: 4px;">
+                <li><code>Code.gs</code></li>
+                <li><code>Database.gs</code></li>
+                <li><code>AI.gs</code></li>
+                <li><code>Prompts.gs</code></li>
+                <li><code>Formula.gs</code></li>
+                <li><code>Index.html</code></li>
+                <li><code>CSS.html</code></li>
+                <li><code>JS.html</code></li>
+              </ul>
+            </li>
+            <li><strong>Tempel Kode:</strong> Salin masing-masing kode yang telah disediakan di lab ini ke file yang bersangkutan.</li>
+            <li><strong>Jalankan Setup Database:</strong> Pilih fungsi <code>setupDatabase</code> di dropdown toolbar Apps Script, lalu klik <strong>Run</strong>. Berikan izin otorisasi akses Google Sheets.</li>
+            <li><strong>Konfigurasi API Key Gemini:</strong> Klik ikon gerigi <strong>Project Settings</strong> di bilah kiri Apps Script → scroll ke <strong>Script Properties</strong> → klik <em>Add script property</em> → isi <code>GEMINI_API_KEY</code> dengan API Key Gemini Anda.</li>
+            <li><strong>Deploy Web App:</strong> Klik tombol biru <strong>Deploy</strong> di kanan atas → <strong>New deployment</strong> → pilih tipe <strong>Web app</strong>:
+              <ul style="margin-left: 20px; margin-top: 4px;">
+                <li><em>Execute as:</em> Me</li>
+                <li><em>Who has access:</em> Anyone</li>
+              </ul>
+              Klik <strong>Deploy</strong> dan buka link Web App yang dihasilkan!
+            </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toast-box"></div>
+
+    <!-- MODAL EDIT VARIATION -->
+    <div id="edit-modal" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 999; display: flex; align-items: center; justify-content: center;">
+      <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--card-radius); padding: 24px; width: 90%; max-width: 600px;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 16px;">Edit Teks Konten</div>
+        <div class="form-group">
+          <label class="form-label">Hook</label>
+          <input type="text" id="modal-edit-hook" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Body Post Utama</label>
+          <textarea id="modal-edit-body" class="form-textarea" rows="6"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CTA Balasan Pertama</label>
+          <input type="text" id="modal-edit-cta" class="form-input">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+          <button class="btn btn-secondary" onclick="closeEditModal()">Batal</button>
+          <button class="btn btn-primary" onclick="saveEditModal()">Simpan Perubahan</button>
+        </div>
+      </div>
+    </div>
+
+    <?!= include('JS'); ?>
+  </body>
+</html>

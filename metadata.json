@@ -1,0 +1,6 @@
+{
+  "name": "Threads Formula Lab",
+  "description": "Laboratorium strategi konten Threads bertenaga AI untuk kreator produk digital. Temukan Formula Final melalui siklus generate, posting, evaluasi, dan evolusi algoritma.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
