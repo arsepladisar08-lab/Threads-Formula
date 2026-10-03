@@ -6,7 +6,9 @@ import {
   PostRecord, 
   PostEvaluation, 
   FormulaModel,
-  ContentPillar
+  ContentPillar,
+  GasConnectionConfig,
+  ThreadsAccount
 } from './types';
 import { 
   getSettings, 
@@ -24,7 +26,9 @@ import {
   addLog,
   seedDemoData,
   resetAllData,
-  initStorageIfNeeded
+  initStorageIfNeeded,
+  getGasConfig,
+  saveGasConfig
 } from './services/storage';
 import { determineFormulaStatus } from './services/formulaEngine';
 import { 
@@ -39,7 +43,7 @@ import {
   publishToThreads, 
   fetchThreadsInsights 
 } from './services/threadsClient';
-import { ThreadsAccount } from './types';
+import { pushGasData } from './services/gasClient';
 
 import { Navbar } from './components/Navbar';
 import { DashboardTab } from './components/DashboardTab';
@@ -50,7 +54,7 @@ import { EvaluationTab } from './components/EvaluationTab';
 import { FormulaTab } from './components/FormulaTab';
 import { HistoryTab } from './components/HistoryTab';
 import { SettingsTab } from './components/SettingsTab';
-import { GasExportTab } from './components/GasExportTab';
+import { GasIntegrationTab } from './components/GasIntegrationTab';
 import { ThreadsConnectModal } from './components/ThreadsConnectModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 
@@ -70,6 +74,8 @@ export default function App() {
   const [threadsAccount, setThreadsAccount] = useState<ThreadsAccount | null>(null);
   const [isThreadsModalOpen, setIsThreadsModalOpen] = useState(false);
 
+  const [gasConfig, setGasConfig] = useState<GasConnectionConfig>(() => getGasConfig());
+
   // Check Threads connection on mount
   useEffect(() => {
     getThreadsStatus()
@@ -79,6 +85,46 @@ export default function App() {
         }
       })
       .catch(console.error);
+  }, []);
+
+  const handleUpdateGasConfig = useCallback((newConfig: GasConnectionConfig) => {
+    setGasConfig(newConfig);
+    saveGasConfig(newConfig);
+  }, []);
+
+  const handleImportFromGas = useCallback((data: {
+    settings?: CreatorSettings;
+    topics?: Topic[];
+    generations?: ContentGeneration[];
+    posts?: PostRecord[];
+    evaluations?: PostEvaluation[];
+    formulas?: FormulaModel[];
+  }) => {
+    if (data.settings) {
+      setSettingsState(data.settings);
+      saveSettings(data.settings);
+    }
+    if (data.topics && Array.isArray(data.topics) && data.topics.length > 0) {
+      setTopicsState(data.topics);
+      saveTopics(data.topics);
+    }
+    if (data.generations && Array.isArray(data.generations) && data.generations.length > 0) {
+      setGenerationsState(data.generations);
+      saveGenerations(data.generations);
+    }
+    if (data.posts && Array.isArray(data.posts) && data.posts.length > 0) {
+      setPostsState(data.posts);
+      savePosts(data.posts);
+    }
+    if (data.evaluations && Array.isArray(data.evaluations) && data.evaluations.length > 0) {
+      setEvaluationsState(data.evaluations);
+      saveEvaluations(data.evaluations);
+    }
+    if (data.formulas && Array.isArray(data.formulas) && data.formulas.length > 0) {
+      setFormulasState(data.formulas);
+      saveFormulas(data.formulas);
+    }
+    addLog('GAS_IMPORT', 'Data berhasil disinkronkan dari Google Spreadsheet');
   }, []);
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -606,7 +652,20 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'gas_code' && <GasExportTab />}
+        {(activeTab === 'gas_integration' || activeTab === 'gas_code') && (
+          <GasIntegrationTab
+            gasConfig={gasConfig}
+            onUpdateGasConfig={handleUpdateGasConfig}
+            settings={settings}
+            topics={topics}
+            generations={generations}
+            posts={posts}
+            evaluations={evaluations}
+            formulas={formulas}
+            onImportData={handleImportFromGas}
+            showToast={showToast}
+          />
+        )}
       </main>
 
       <footer className="border-t border-neutral-900 bg-neutral-950 py-6 text-center text-xs text-neutral-500">

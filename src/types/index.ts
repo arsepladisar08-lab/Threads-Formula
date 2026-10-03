@@ -147,3 +147,11 @@ export interface AppLog {
   detail: string;
   error?: string;
 }
+
+export interface GasConnectionConfig {
+  web_app_url: string;
+  is_connected: boolean;
+  auto_sync: boolean;
+  last_synced_at?: string;
+  spreadsheet_name?: string;
+}

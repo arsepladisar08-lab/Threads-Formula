@@ -55,7 +55,7 @@ function callAI(systemPrompt, userPrompt, expectJson) {
  */
 function callGeminiApi_(systemPrompt, userPrompt, isRetry) {
   var apiKey = getApiKey_();
-  var model = 'gemini-2.5-flash';
+  var model = 'gemini-3.8-flash';
   var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
 
   var promptWithRetryNote = userPrompt;

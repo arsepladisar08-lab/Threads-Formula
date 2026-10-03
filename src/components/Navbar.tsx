@@ -54,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'formula', label: 'Formula' },
     { id: 'riwayat', label: 'Riwayat' },
     { id: 'pengaturan', label: 'Pengaturan' },
-    { id: 'gas_code', label: 'Kode GAS' },
+    { id: 'gas_integration', label: 'Koneksi GAS' },
   ];
 
   return (

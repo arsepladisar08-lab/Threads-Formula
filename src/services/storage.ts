@@ -5,7 +5,8 @@ import {
   PostRecord, 
   PostEvaluation, 
   FormulaModel, 
-  AppLog 
+  AppLog,
+  GasConnectionConfig
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -16,6 +17,7 @@ const STORAGE_KEYS = {
   EVALUATIONS: 'threads_lab_evaluations',
   FORMULAS: 'threads_lab_formulas',
   LOGS: 'threads_lab_logs',
+  GAS_CONFIG: 'threads_lab_gas_config',
 };
 
 export const DEFAULT_SETTINGS: CreatorSettings = {
@@ -448,4 +450,26 @@ export function initStorageIfNeeded(): void {
     // If first time visit, automatically seed rich demo data so app is immediately alive!
     seedDemoData();
   }
+}
+
+export const DEFAULT_GAS_CONFIG: GasConnectionConfig = {
+  web_app_url: '',
+  is_connected: false,
+  auto_sync: false,
+  last_synced_at: undefined,
+  spreadsheet_name: undefined,
+};
+
+export function getGasConfig(): GasConnectionConfig {
+  const raw = localStorage.getItem(STORAGE_KEYS.GAS_CONFIG);
+  if (!raw) return DEFAULT_GAS_CONFIG;
+  try {
+    return { ...DEFAULT_GAS_CONFIG, ...JSON.parse(raw) };
+  } catch (err) {
+    return DEFAULT_GAS_CONFIG;
+  }
+}
+
+export function saveGasConfig(config: GasConnectionConfig): void {
+  localStorage.setItem(STORAGE_KEYS.GAS_CONFIG, JSON.stringify(config));
 }

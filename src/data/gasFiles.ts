@@ -560,7 +560,7 @@ function seedDemoData() {
   {
     name: 'AI.gs',
     type: 'gs',
-    description: 'Lapisan adapter AI untuk Gemini API (gemini-2.5-flash) via UrlFetchApp dengan mekanisme retry 2x untuk validasi format JSON.',
+    description: 'Lapisan adapter AI untuk Gemini API (gemini-3.8-flash) via UrlFetchApp dengan mekanisme retry 2x untuk validasi format JSON.',
     code: `/**
  * AI.gs - Lapisan Adapter AI untuk Google Apps Script
  */
@@ -599,7 +599,7 @@ function callAI(systemPrompt, userPrompt, expectJson) {
 
 function callGeminiApi_(systemPrompt, userPrompt, isRetry) {
   var apiKey = getApiKey_();
-  var model = 'gemini-2.5-flash';
+  var model = 'gemini-3.8-flash';
   var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
 
   var promptText = userPrompt;
